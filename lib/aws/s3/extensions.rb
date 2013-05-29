@@ -26,16 +26,9 @@ class Hash
 end
 
 class String
-  if RUBY_VERSION <= '1.9'
-    def previous!
-      self[-1] -= 1
-      self
-    end
-  else
-    def previous!
-      self[-1] = (self[-1].ord - 1).chr
-      self
-    end
+  def previous!
+    self[-1] = (self[-1].ord - 1).chr
+    self
   end
   
   def previous
@@ -55,36 +48,21 @@ class String
       tr("-", "_").downcase
   end unless public_method_defined? :underscore
 
-  if RUBY_VERSION >= '1.9'
-    def valid_utf8?
-      dup.force_encoding('UTF-8').valid_encoding?
-    end
-  else
-    def valid_utf8?
-      scan(Regexp.new('[^\x00-\xa0]', nil, 'u')) { |s| s.unpack('U') }
-      true
-    rescue ArgumentError
-      false
-    end
+  def valid_utf8?
+    dup.force_encoding('UTF-8').valid_encoding?
   end
-  
+
   # All paths in in S3 have to be valid unicode so this takes care of 
   # cleaning up any strings that aren't valid utf-8 according to String#valid_utf8?
-  if RUBY_VERSION >= '1.9'
-    def remove_extended!
-      sanitized_string = ''
-      each_byte do |byte|
-        character = byte.chr
-        sanitized_string << character if character.ascii_only?
-      end
-      sanitized_string
+  def remove_extended!
+    sanitized_string = ''
+    each_byte do |byte|
+      character = byte.chr
+      sanitized_string << character if character.ascii_only?
     end
-  else
-    def remove_extended!
-      gsub!(/[\x80-\xFF]/) { "%02X" % $&[0] }
-    end
+    sanitized_string
   end
-  
+
   def remove_extended
     dup.remove_extended!
   end
@@ -125,16 +103,12 @@ class Symbol
 end
 
 module Kernel
-  def __method__(depth = 0)
-    caller[depth][/`([^']+)'/, 1]
-  end if RUBY_VERSION <= '1.8.7'
-  
   def __called_from__
     caller[1][/`([^']+)'/, 1]
-  end if RUBY_VERSION > '1.8.7'
+  end
   
   def expirable_memoize(reload = false, storage = nil)
-    current_method = RUBY_VERSION > '1.8.7' ? __called_from__ : __method__(1)
+    current_method =  __called_from__
     storage = "@#{storage || current_method}"
     if reload 
       instance_variable_set(storage, nil)
@@ -147,9 +121,7 @@ module Kernel
   end
 
   def require_library_or_gem(library, gem_name = nil)
-    if RUBY_VERSION >= '1.9'
-      gem(gem_name || library, '>=0') 
-    end
+    gem(gem_name || library, '>=0')
     require library
   rescue LoadError => library_not_installed
     begin
@@ -329,19 +301,6 @@ module Net
     def chunk_size
       1048576 # 1 megabyte
     end
-  end
-  
-  # Net::HTTP before 1.8.4 doesn't have the use_ssl? method or the Delete request type
-  class HTTP
-    def use_ssl?
-      @use_ssl
-    end unless public_method_defined? :use_ssl?
-    
-    class Delete < HTTPRequest
-      METHOD = 'DELETE'
-      REQUEST_HAS_BODY = false
-      RESPONSE_HAS_BODY = true
-    end unless const_defined? :Delete
   end
 end
 
